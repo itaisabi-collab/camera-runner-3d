@@ -221,13 +221,9 @@ const road=new THREE.Mesh(new THREE.PlaneGeometry(RW,RL),
 road.rotation.x=-Math.PI/2;road.position.set(0,0,-RL/2+20);road.receiveShadow=true;sc.add(road);
 
 // Ground
-sc.add(Object.assign(new THREE.Mesh(new THREE.PlaneGeometry(500,600),
-    new THREE.MeshStandardMaterial({color:0x1a0d40,roughness:0.9})),
-    {rotation:{x:-Math.PI/2,y:0,z:0},position:{x:0,y:-0.05,z:-150}}));
-// Fix: set rotation/position properly
-sc.children[sc.children.length-1].rotation.x=-Math.PI/2;
-sc.children[sc.children.length-1].position.set(0,-0.05,-150);
-sc.children[sc.children.length-1].receiveShadow=true;
+const gnd=new THREE.Mesh(new THREE.PlaneGeometry(500,600),
+    new THREE.MeshStandardMaterial({color:0x1a0d40,roughness:0.9}));
+gnd.rotation.x=-Math.PI/2;gnd.position.set(0,-0.05,-150);gnd.receiveShadow=true;sc.add(gnd);
 
 // Neon edges (cylinder for roundness)
 const edgeMat=new THREE.MeshBasicMaterial({color:0xff44dd});
