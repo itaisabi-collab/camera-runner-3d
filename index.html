@@ -474,24 +474,42 @@ const vid=document.getElementById('vid'),pCvs=document.getElementById('poseCvs')
 const SK=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
 let pDet=null;
 async function initPose(){
+    gestEl.style.display='block';
+    gestEl.textContent='Requesting camera...';
     // Always request camera first
     try{
         const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640},height:{ideal:480}}});
         vid.srcObject=stream;await vid.play();G.camOK=true;
         const box=document.getElementById('camBox');pCvs.width=box.clientWidth;pCvs.height=box.clientHeight;
+        gestEl.textContent='Camera OK!';
     }catch(e){
         console.log('Camera not available:',e);
-        document.getElementById('camBox').style.display='none';gestEl.style.display='none';
+        gestEl.textContent='No camera: use arrows/swipe';
+        gestEl.style.color='#f88';
+        document.getElementById('camBox').style.display='none';
         return;
     }
     // Then try pose detection if MediaPipe loaded
-    if(typeof Pose==='undefined'){console.log('MediaPipe not loaded, camera only');return}
+    if(typeof Pose==='undefined'){
+        gestEl.textContent='Camera only (no body tracking)';
+        return;
+    }
+    gestEl.textContent='Loading body tracking...';
     try{
         pDet=new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
-        pDet.setOptions({modelComplexity:1,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:.6,minTrackingConfidence:.5});
+        pDet.setOptions({modelComplexity:0,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:.5,minTrackingConfidence:.5});
         pDet.onResults(onPR);
+        gestEl.textContent='Warming up...';
+        // Send first frame to initialize model
+        if(vid.readyState>=2){
+            try{await pDet.send({image:vid})}catch(e){}
+        }
+        gestEl.textContent='Body tracking ready!';
         (async function lp(){if(pDet&&vid.readyState>=2)try{await pDet.send({image:vid})}catch(e){}requestAnimationFrame(lp)})();
-    }catch(e){console.log('Pose detection failed:',e)}
+    }catch(e){
+        console.log('Pose detection failed:',e);
+        gestEl.textContent='Tracking failed: use arrows/swipe';
+    }
 }
 function onPR(r){
     if(!r.poseLandmarks){G.pose.ready=false;return}
