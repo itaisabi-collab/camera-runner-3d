@@ -91,6 +91,10 @@ async function boot(){
         try{await loadScript(u);if(typeof THREE!=='undefined')break}catch(e){}
     }
     if(typeof THREE==='undefined'){lt.textContent='Cannot load 3D engine';lt.style.color='#f55';return}
+    lt.textContent='Loading effects...';
+    const bloomScripts=['postprocessing/EffectComposer','postprocessing/RenderPass','postprocessing/UnrealBloomPass','postprocessing/ShaderPass','shaders/LuminosityHighPassShader','shaders/CopyShader'];
+    window._bloomOK=true;
+    for(const s of bloomScripts){try{await loadScript('https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/'+s+'.js')}catch(e){window._bloomOK=false;break}}
     lt.textContent='Loading pose detection...';
     try{await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js')}catch(e){}
     lt.textContent='Ready!';
@@ -146,7 +150,24 @@ sc.fog=new THREE.FogExp2(0x5533aa,0.004);
 
 const cam=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,500);
 cam.position.set(0,7.5,13);cam.lookAt(0,1.5,-30);
-addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight)});
+
+// ═══════════════════ BLOOM POST-PROCESSING ═══════════════════
+let composer=null,bloomPass=null;
+if(window._bloomOK&&THREE.EffectComposer){
+    try{
+        composer=new THREE.EffectComposer(ren);
+        composer.addPass(new THREE.RenderPass(sc,cam));
+        bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.5,0.4,0.82);
+        composer.addPass(bloomPass);
+    }catch(e){composer=null;console.log('Bloom failed:',e)}
+}
+
+// ═══════════════════ CAMERA EFFECTS ═══════════════════
+let shakeIntensity=0;
+const baseFOV=72;
+function triggerShake(v){shakeIntensity=Math.max(shakeIntensity,v)}
+
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();ren.setSize(innerWidth,innerHeight);if(composer)composer.setSize(innerWidth,innerHeight)});
 
 // ═══════════════════ LIGHTS ═══════════════════
 sc.add(new THREE.AmbientLight(0xaaaaff,1.5));
