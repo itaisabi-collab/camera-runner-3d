@@ -1,0 +1,20 @@
+{
+  "name": "run3d-camera-runner",
+  "version": "1.0.0",
+  "description": "RUN! 3D - Camera Runner Game",
+  "main": "index.js",
+  "scripts": {
+    "sync": "npx cap sync android",
+    "build": "npx cap sync android"
+  },
+  "author": "Itai",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/camera": "^8.0.2",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capgo/capacitor-screen-recorder": "^8.2.24"
+  }
+}

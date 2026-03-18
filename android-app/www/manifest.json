@@ -1,0 +1,17 @@
+{
+  "name": "RUN! 3D - Camera Runner",
+  "short_name": "RUN! 3D",
+  "description": "3D endless runner with camera body tracking",
+  "start_url": "/camera-runner-3d/",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0a0020",
+  "theme_color": "#0a0020",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏃</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
