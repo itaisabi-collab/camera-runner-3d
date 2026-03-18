@@ -1187,99 +1187,123 @@ const partSystem=new THREE.Points(partGeo,partMat);sc.add(partSystem);
 function spawnParts(x,y,z,color,count,opts){const col=new THREE.Color(color);const o=opts||{};for(let i=0;i<count&&G.particles.length<MAX_PARTS;i++){G.particles.push({x,y,z,vx:(Math.random()-.5)*(o.spread||6),vy:Math.random()*(o.upForce||5)+(o.upMin||2),vz:(Math.random()-.5)*(o.spreadZ||3),life:o.life||(0.6+Math.random()*0.4),r:col.r,g:col.g,b:col.b,gravity:o.gravity!==undefined?o.gravity:9})}}
 function spawnConfetti(x,y,z,n){const cs=[0xff1493,0x00e5ff,0xFFD700,0x76ff03,0xff4444,0xff44dd,0x44ccff];for(let i=0;i<n;i++){const c=new THREE.Color(cs[i%cs.length]);if(G.particles.length<MAX_PARTS)G.particles.push({x:x+(Math.random()-.5)*4,y:y+Math.random()*2,z:z+(Math.random()-.5)*2,vx:(Math.random()-.5)*12,vy:Math.random()*10+5,vz:(Math.random()-.5)*6,life:1.2+Math.random()*0.6,r:c.r,g:c.g,b:c.b,gravity:6})}}
 
-// ═══════════════════ AUDIO - DYNAMIC MUSIC PER STAGE ═══════════════════
-let audioCtx,musicPlaying=false,musicTimeout,masterGain;
+// ═══════════════════ AUDIO - FRESH MUSIC ENGINE ═══════════════════
+let audioCtx,musicPlaying=false,musicInterval=null,masterGain=null;
 function getAC(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx}
 
-// 6 unique melodies - one per stage theme, each with different feel
-const STAGE_MUSIC=[
-    // Stage 1: City Morning - upbeat, cheerful (C major)
-    {mel:[523,587,659,784,880,784,659,784,523,659,784,880,1047,880,784,659,
-          587,659,784,880,784,659,523,587,659,784,659,523,587,523,659,587],
-     bass:[131,165,196,165,131,165,196,165,131,165,196,165,131,165,196,165,
-           147,175,220,175,147,175,220,175,147,175,220,175,147,175,220,175],
-     bpm:155,wave:'sine',harm:'triangle'},
-    // Stage 2: Golden Hour - warm, funky (F major)
-    {mel:[698,784,880,1047,880,784,698,784,880,698,784,880,1047,1175,1047,880,
-          698,880,784,698,587,698,784,880,698,587,523,587,698,784,698,587],
-     bass:[175,175,220,220,175,175,147,147,175,175,220,220,262,262,220,220,
-           175,175,220,220,175,175,147,147,131,131,175,175,220,220,175,175],
-     bpm:140,wave:'triangle',harm:'sine'},
-    // Stage 3: Night City - intense, electronic (D minor)
-    {mel:[587,698,880,1047,880,698,587,523,587,698,784,880,784,698,587,698,
-          523,587,698,784,698,587,523,587,440,523,587,698,587,523,440,523],
-     bass:[147,147,175,175,147,147,131,131,147,147,175,175,196,196,175,175,
-           131,131,147,147,175,175,147,147,110,110,131,131,147,147,131,131],
-     bpm:165,wave:'sawtooth',harm:'square'},
-    // Stage 4: Industrial - heavy, driving (A minor)
-    {mel:[440,523,659,784,659,523,440,523,440,523,587,659,784,659,587,523,
-          440,659,523,784,440,659,880,784,587,659,523,440,392,440,523,440],
-     bass:[110,110,131,131,147,147,110,110,131,131,147,147,165,165,147,147,
-           110,110,131,131,147,147,165,165,147,147,131,131,110,110,131,131],
-     bpm:170,wave:'square',harm:'sawtooth'},
-    // Stage 5: Tropical - playful, bouncy (G major)
-    {mel:[784,880,988,1175,988,880,784,880,659,784,880,988,1175,1319,1175,988,
-          784,988,880,784,659,784,880,988,784,659,587,659,784,880,784,659],
-     bass:[196,196,247,247,196,196,165,165,196,196,247,247,330,330,247,247,
-           196,196,247,247,196,196,165,165,147,147,196,196,247,247,196,196],
-     bpm:160,wave:'sine',harm:'triangle'},
-    // Stage 6: Underground - dark, pulsing (E minor)
-    {mel:[330,392,494,587,494,392,330,392,330,440,494,587,659,587,494,440,
-          330,494,392,587,330,494,659,587,440,494,392,330,294,330,392,330],
-     bass:[82,82,110,110,82,82,98,98,82,82,110,110,131,131,110,110,
-           82,82,110,110,82,82,98,98,73,73,82,82,110,110,82,82],
-     bpm:150,wave:'sawtooth',harm:'triangle'}
+// Catchy EDM/chiptune melodies per stage
+const TRACKS=[
+  // 1: Happy Bounce (C maj pentatonic) - bubbly, cheerful
+  {notes:[0,4,7,12,7,4,0,4,5,7,12,16,12,7,5,4],
+   base:262,bass:[0,0,5,5,7,7,0,0],bassBase:65,bpm:150,
+   wave:'sine',bwave:'triangle',arp:true},
+  // 2: Sunset Groove (F maj) - chill funky
+  {notes:[0,3,7,10,12,10,7,3,0,5,8,12,15,12,8,5],
+   base:349,bass:[0,0,3,3,5,5,7,7],bassBase:87,bpm:130,
+   wave:'triangle',bwave:'sine',arp:false},
+  // 3: Neon Chase (D min) - intense, driving
+  {notes:[0,3,7,12,15,12,7,3,0,2,5,7,10,12,10,7],
+   base:294,bass:[0,0,0,5,7,7,5,0],bassBase:73,bpm:170,
+   wave:'sawtooth',bwave:'square',arp:true},
+  // 4: Steel Factory (A min) - heavy, mechanical
+  {notes:[0,3,5,7,12,7,5,3,0,7,5,3,0,12,10,7],
+   base:220,bass:[0,0,3,3,5,5,3,0],bassBase:55,bpm:160,
+   wave:'square',bwave:'sawtooth',arp:false},
+  // 5: Beach Run (G maj) - bright, energetic
+  {notes:[0,4,7,11,12,11,7,4,0,2,7,12,14,12,7,2],
+   base:392,bass:[0,0,5,5,7,7,2,2],bassBase:98,bpm:155,
+   wave:'sine',bwave:'triangle',arp:true},
+  // 6: Deep Tunnel (E min) - dark, pulsing
+  {notes:[0,3,7,10,12,10,7,3,0,5,7,12,15,12,7,5],
+   base:165,bass:[0,0,3,5,7,5,3,0],bassBase:41,bpm:140,
+   wave:'sawtooth',bwave:'triangle',arp:false}
 ];
 
-function startMusic(){
-    if(musicPlaying)return;musicPlaying=true;
-    const ac=getAC();masterGain=ac.createGain();masterGain.gain.value=0.12;masterGain.connect(ac.destination);
-    let t0=ac.currentTime+0.1;
-    function sched(){
-        if(!musicPlaying)return;
-        const stg=STAGE_MUSIC[G.theme%STAGE_MUSIC.length];
-        const bpm=stg.bpm+Math.floor(G.speed*20);
-        const nLen=60/bpm;
-        const mel=stg.mel,bass=stg.bass;
-        for(let i=0;i<mel.length;i++){
-            const t=t0+i*nLen;
-            // Melody
-            const o1=ac.createOscillator(),g1=ac.createGain();
-            o1.type=stg.wave;o1.frequency.value=mel[i];
-            g1.gain.setValueAtTime(0.1,t);g1.gain.exponentialRampToValueAtTime(0.001,t+nLen*.8);
-            o1.connect(g1);g1.connect(masterGain);o1.start(t);o1.stop(t+nLen);
-            // Harmony
-            const o2=ac.createOscillator(),g2=ac.createGain();
-            o2.type=stg.harm;o2.frequency.value=mel[i]*1.25;
-            g2.gain.setValueAtTime(0.04,t);g2.gain.exponentialRampToValueAtTime(0.001,t+nLen*.7);
-            o2.connect(g2);g2.connect(masterGain);o2.start(t);o2.stop(t+nLen);
-            // Bass
-            const o3=ac.createOscillator(),g3=ac.createGain();
-            o3.type='sine';o3.frequency.value=bass[i%bass.length];
-            g3.gain.setValueAtTime(0.09,t);g3.gain.exponentialRampToValueAtTime(0.003,t+nLen*.9);
-            o3.connect(g3);g3.connect(masterGain);o3.start(t);o3.stop(t+nLen);
-            // Drums - kick on beats, hihat on off-beats
-            if(i%4===0){// Kick
-                const o4=ac.createOscillator(),g4=ac.createGain();
-                o4.type='sine';o4.frequency.value=60;
-                g4.gain.setValueAtTime(0.15,t);g4.gain.exponentialRampToValueAtTime(0.001,t+0.08);
-                o4.connect(g4);g4.connect(masterGain);o4.start(t);o4.stop(t+0.1);
-            }
-            if(i%2===0){// Snare/hihat
-                const buf=ac.createBuffer(1,ac.sampleRate*0.02,ac.sampleRate);
-                const d=buf.getChannelData(0);for(let j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*.2;
-                const n=ac.createBufferSource();n.buffer=buf;
-                const ng=ac.createGain();ng.gain.setValueAtTime(i%4===2?0.1:0.05,t);
-                ng.gain.exponentialRampToValueAtTime(0.001,t+0.03);
-                n.connect(ng);ng.connect(masterGain);n.start(t);
-            }
-        }
-        t0+=mel.length*nLen;
-        musicTimeout=setTimeout(sched,(mel.length*nLen*1000)*0.5);
-    }
-    sched();
+let beatIndex=0;
+function stopMusic(){
+    musicPlaying=false;
+    if(musicInterval){clearInterval(musicInterval);musicInterval=null}
+    // Kill all sound instantly by disconnecting master
+    if(masterGain){try{masterGain.disconnect()}catch(e){}}
+    masterGain=null;
 }
-function stopMusic(){musicPlaying=false;clearTimeout(musicTimeout)}
+
+function startMusic(){
+    stopMusic();// always fully stop first
+    musicPlaying=true;beatIndex=0;
+    const ac=getAC();
+    masterGain=ac.createGain();masterGain.gain.value=0.15;
+    masterGain.connect(ac.destination);
+
+    function playBeat(){
+        if(!musicPlaying||!masterGain)return;
+        const tr=TRACKS[G.theme%TRACKS.length];
+        const bpm=tr.bpm+Math.floor(G.speed*15);
+        const beatLen=60/bpm;
+        const now=ac.currentTime;
+        const ni=beatIndex%tr.notes.length;
+        const bi=beatIndex%tr.bass.length;
+
+        // Melody note
+        const freq=tr.base*Math.pow(2,tr.notes[ni]/12);
+        const o1=ac.createOscillator(),g1=ac.createGain();
+        o1.type=tr.wave;o1.frequency.value=freq;
+        g1.gain.setValueAtTime(0.1,now);
+        g1.gain.exponentialRampToValueAtTime(0.001,now+beatLen*0.8);
+        o1.connect(g1);g1.connect(masterGain);o1.start(now);o1.stop(now+beatLen);
+
+        // Arpeggio (if enabled, play a quick secondary note)
+        if(tr.arp&&beatIndex%2===0){
+            const arpFreq=freq*1.5;
+            const o5=ac.createOscillator(),g5=ac.createGain();
+            o5.type=tr.wave;o5.frequency.value=arpFreq;
+            g5.gain.setValueAtTime(0.04,now+beatLen*0.25);
+            g5.gain.exponentialRampToValueAtTime(0.001,now+beatLen*0.6);
+            o5.connect(g5);g5.connect(masterGain);o5.start(now+beatLen*0.25);o5.stop(now+beatLen*0.7);
+        }
+
+        // Bass
+        const bFreq=tr.bassBase*Math.pow(2,tr.bass[bi]/12);
+        const o2=ac.createOscillator(),g2=ac.createGain();
+        o2.type=tr.bwave;o2.frequency.value=bFreq;
+        g2.gain.setValueAtTime(0.12,now);
+        g2.gain.exponentialRampToValueAtTime(0.001,now+beatLen*0.9);
+        o2.connect(g2);g2.connect(masterGain);o2.start(now);o2.stop(now+beatLen);
+
+        // Kick every 4 beats
+        if(beatIndex%4===0){
+            const ok=ac.createOscillator(),gk=ac.createGain();
+            ok.type='sine';ok.frequency.setValueAtTime(150,now);
+            ok.frequency.exponentialRampToValueAtTime(30,now+0.08);
+            gk.gain.setValueAtTime(0.2,now);gk.gain.exponentialRampToValueAtTime(0.001,now+0.1);
+            ok.connect(gk);gk.connect(masterGain);ok.start(now);ok.stop(now+0.12);
+        }
+        // Snare on 2 and 4
+        if(beatIndex%4===2){
+            const buf=ac.createBuffer(1,ac.sampleRate*0.04,ac.sampleRate);
+            const d=buf.getChannelData(0);for(let j=0;j<d.length;j++)d[j]=(Math.random()*2-1);
+            const sn=ac.createBufferSource();sn.buffer=buf;
+            const sg=ac.createGain();sg.gain.setValueAtTime(0.12,now);
+            sg.gain.exponentialRampToValueAtTime(0.001,now+0.05);
+            sn.connect(sg);sg.connect(masterGain);sn.start(now);
+        }
+        // Hi-hat
+        if(beatIndex%2===0){
+            const buf=ac.createBuffer(1,ac.sampleRate*0.015,ac.sampleRate);
+            const d=buf.getChannelData(0);for(let j=0;j<d.length;j++)d[j]=(Math.random()*2-1)*0.5;
+            const hh=ac.createBufferSource();hh.buffer=buf;
+            const hg=ac.createGain();hg.gain.setValueAtTime(0.06,now);
+            hg.gain.exponentialRampToValueAtTime(0.001,now+0.02);
+            hh.connect(hg);hg.connect(masterGain);hh.start(now);
+        }
+
+        beatIndex++;
+        // Adjust interval to current BPM
+        if(musicInterval)clearInterval(musicInterval);
+        musicInterval=setInterval(playBeat,(60/bpm)*1000);
+    }
+    playBeat();
+}
 function sfx(f,d,t,v){try{const a=getAC(),o=a.createOscillator(),g=a.createGain();o.type=t||'square';o.frequency.value=f;g.gain.value=v||.06;g.gain.exponentialRampToValueAtTime(.001,a.currentTime+d);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+d)}catch(e){}}
 function sfxCoin(){sfx(880,.07,'sine',.06);setTimeout(()=>sfx(1320,.05,'sine',.05),35)}
 function sfxJump(){sfx(523,.08,'sine',.05);sfx(784,.08,'sine',.04)}
