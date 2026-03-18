@@ -286,7 +286,7 @@ let ren;
 try{ren=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',preserveDrawingBuffer:true})}
 catch(e){lt.textContent='WebGL not supported';return}
 ren.setSize(innerWidth,innerHeight);ren.setPixelRatio(Math.min(devicePixelRatio,2));
-ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;
+ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFShadowMap;// faster than PCFSoft
 ren.toneMapping=THREE.ACESFilmicToneMapping;ren.toneMappingExposure=1.8;
 ren.outputColorSpace=THREE.SRGBColorSpace;
 document.getElementById('game').appendChild(ren.domElement);
@@ -295,12 +295,8 @@ const sc=new THREE.Scene();sc.background=new THREE.Color(0x0a0030);sc.fog=new TH
 const cam=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,500);
 cam.position.set(0,7.5,13);cam.lookAt(0,1.5,-30);
 
+// Bloom disabled for better performance
 let composer=null,bloomPass=null;
-if(window._bloomOK&&THREE.EffectComposer){
-    try{composer=new THREE.EffectComposer(ren);composer.addPass(new THREE.RenderPass(sc,cam));
-    bloomPass=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.6,0.4,0.78);
-    composer.addPass(bloomPass)}catch(e){composer=null}
-}
 
 let shakeIntensity=0;const baseFOV=72;let targetFOV=baseFOV;
 function triggerShake(v){shakeIntensity=Math.max(shakeIntensity,v)}
@@ -1181,7 +1177,7 @@ const coinGeo=_tor(0.55,0.22);const coinMat=matS(0xFFD700,{r:0.08,m:0.95,e:0xcc8
 function mkPU(pt){const g=new THREE.Group();const c=new THREE.Mesh(_oct(0.7),matS(pt.glow,{r:0.1,m:0.9,e:pt.glow,ei:0.7}));c.position.y=2;g.add(c);const r=new THREE.Mesh(_tor(1,0.06),matB(pt.glow,{t:0.6}));r.position.y=2;g.add(r);g.add((function(){var _l=new THREE.PointLight(pt.glow,2,10);_l.position.set(0,2,0);return _l})());g.userData={ring:r,crystal:c};return g}
 
 // ═══════════════════ PARTICLES ═══════════════════
-const partGeo=new THREE.BufferGeometry();const MAX_PARTS=400;
+const partGeo=new THREE.BufferGeometry();const MAX_PARTS=150;
 const partPositions=new Float32Array(MAX_PARTS*3),partColors=new Float32Array(MAX_PARTS*3);
 partGeo.setAttribute('position',new THREE.BufferAttribute(partPositions,3));
 partGeo.setAttribute('color',new THREE.BufferAttribute(partColors,3));
@@ -1370,7 +1366,6 @@ function update(dt){
     else if(G.pu.x2>0){auraLight.color.set(0x76ff03);auraLight.intensity=3}
     else if(G.pu.magnet>0){auraLight.color.set(0xff1493);auraLight.intensity=3}
     else{auraLight.intensity=Math.min(2,G.combo*0.2)}
-    if(bloomPass)bloomPass.strength=0.5+G.speed*0.15+Math.min(0.3,G.combo*0.02);
     roadTex.offset.y-=G.speed*eDt*2.5;
     if(G.camOK)detectG();
     const pl=G.pl,tx=LX[pl.tgt];
@@ -1430,7 +1425,7 @@ function update(dt){
     cam.position.x+=(chr.position.x*.35-cam.position.x)*Math.min(1,eDt*6);
     targetFOV=baseFOV+G.speed*6;cam.fov+=(targetFOV-cam.fov)*Math.min(1,eDt*3);cam.updateProjectionMatrix();
     cam.lookAt(chr.position.x*.3,1.5,-28);sun.target.position.set(chr.position.x,0,-5);
-    if(shakeIntensity>0.01){cam.position.x+=(Math.random()-.5)*shakeIntensity;cam.position.y+=7.5+(Math.random()-.5)*shakeIntensity;shakeIntensity*=0.92}
+    if(shakeIntensity>0.01){cam.position.x+=(Math.random()-.5)*shakeIntensity;cam.position.y=7.5+(Math.random()-.5)*shakeIntensity;shakeIntensity*=0.88}else{cam.position.y=7.5}
     drawSpeedLines(G.speed);
     // Combo fire
     const cf=document.getElementById('comboFire');if(G.combo>=5){cf.style.height=Math.min(120,G.combo*6)+'px'}else cf.style.height='0';
@@ -1538,6 +1533,9 @@ function beginPlay(){
     // Cancel any pending game-over popup & hide all overlays
     if(goTimeout){clearTimeout(goTimeout);goTimeout=null}
     document.getElementById('goOv').style.display='none';
+    // Reset camera to starting position
+    cam.position.set(0,7.5,13);cam.fov=baseFOV;cam.updateProjectionMatrix();
+    shakeIntensity=0;
     G.st='playing';G.score=0;G.speed=C.SPD0;G.time=0;G.spawnT=0;G.combo=0;G.mxC=0;G.nC=0;G.lv=1;G.sub=1;G.energy=100;G.particles=[];
     G.streak=0;G.bestStreak=0;G.pu={shield:0,magnet:0,slowmo:0,x2:0};collectedPUTypes=new Set();
     G.pl={lane:1,tgt:1,disp:1,jump:false,duck:false,jt:0,dt:0,rf:0,y:0};
