@@ -133,6 +133,7 @@
         <div><span>🙌</span>Arms Up = Jump</div><div><span>🧎</span>Crouch = Duck</div>
     </div>
     <button class="btn" id="startBtn">▶ PLAY</button>
+    <button class="btn" id="tvBtn" style="background:linear-gradient(135deg,#ff6b35,#ff1493);margin-top:8px;padding:12px 36px;font-size:1em">📺 Play on TV</button>
     <div id="loadTxt">Loading...</div>
     <p style="font-size:.7em;color:rgba(150,160,200,.35);margin-top:6px">Arrows / Swipe also work</p>
 </div>
@@ -150,6 +151,33 @@
     </div>
     <div class="char-dots" id="charDots"></div>
     <button class="btn" id="selectChar">✅ SELECT</button>
+</div>
+<div id="tvOv" class="ov" style="display:none">
+    <h1>📺 TV Mode</h1>
+    <div id="tvPhone" style="display:none">
+        <p style="font-size:1.2em">Your room code:</p>
+        <div id="tvCode" style="font-size:4em;font-weight:900;color:#00e5ff;text-shadow:0 0 30px rgba(0,229,255,.5);letter-spacing:10px;margin:10px 0">----</div>
+        <p>On your TV browser, open:</p>
+        <p style="font-size:1.1em;color:#FFD700;word-break:break-all" id="tvUrl"></p>
+        <p style="margin-top:10px" id="tvStatus">Waiting for TV to connect...</p>
+        <button class="btn" id="tvCancelBtn" style="background:rgba(255,255,255,.1);margin-top:10px;padding:10px 30px;font-size:.9em">Cancel</button>
+    </div>
+    <div id="tvTV" style="display:none">
+        <p style="font-size:1.5em;margin:20px 0">Enter room code from phone:</p>
+        <div style="display:flex;gap:8px;justify-content:center;margin:15px 0">
+            <input id="tvInput" type="text" maxlength="6" style="font-size:2.5em;width:200px;text-align:center;padding:10px;border-radius:16px;border:2px solid rgba(0,229,255,.4);background:rgba(10,3,30,.8);color:#00e5ff;font-weight:bold;letter-spacing:8px" placeholder="CODE">
+        </div>
+        <button class="btn" id="tvConnectBtn">🔗 Connect</button>
+        <p id="tvTVStatus" style="margin-top:10px"></p>
+        <button class="btn" id="tvBackBtn" style="background:rgba(255,255,255,.1);margin-top:10px;padding:10px 30px;font-size:.9em">Back</button>
+    </div>
+    <div id="tvChoose">
+        <p style="font-size:1.2em;margin:15px 0">Choose this device's role:</p>
+        <button class="btn" id="tvAsPhone" style="margin:8px;padding:14px 40px">📱 Phone (Camera + Controls)</button><br>
+        <button class="btn" id="tvAsTV" style="margin:8px;padding:14px 40px;background:linear-gradient(135deg,#ff6b35,#ff1493)">📺 TV (Display)</button><br>
+        <button class="btn" id="tvMirrorBtn" style="background:rgba(255,255,255,.1);margin:8px;padding:10px 30px;font-size:.9em">🪞 Just Mirror (Chromecast/AirPlay)</button>
+        <p style="font-size:.7em;color:rgba(150,160,200,.4);margin-top:10px">Both devices must be on the same network</p>
+    </div>
 </div>
 <div id="calOv" class="ov"><p style="font-size:1.3em">📷 Stand in front of camera</p><div class="cd" id="calCD">3</div><p>Stand straight, arms down</p></div>
 <div id="goOv" class="ov">
@@ -179,6 +207,8 @@ async function boot(){
     const bloomScripts=['postprocessing/EffectComposer','postprocessing/RenderPass','postprocessing/UnrealBloomPass','postprocessing/ShaderPass','shaders/LuminosityHighPassShader','shaders/CopyShader'];
     window._bloomOK=true;
     for(const s of bloomScripts){try{await loadScript('https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/'+s+'.js')}catch(e){window._bloomOK=false;break}}
+    lt.textContent='Loading networking...';
+    try{await loadScript('https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js')}catch(e){console.log('PeerJS failed')}
     lt.textContent='Loading model loader...';
     try{await loadScript('https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/loaders/GLTFLoader.js')}catch(e){console.log('GLTFLoader failed')}
     lt.textContent='Loading pose detection...';
@@ -1605,6 +1635,149 @@ document.getElementById('prevChar').addEventListener('click',()=>{G.selectedChar
 document.getElementById('nextChar').addEventListener('click',()=>{G.selectedChar=(G.selectedChar+1)%CHAR_DATA.length;updateCharPreview()});
 document.getElementById('reBtn').addEventListener('click',()=>goToCharSelect());
 document.getElementById('quickReBtn').addEventListener('click',()=>quickRestart());
+
+// ═══════════════════ TV MODE (PeerJS WebRTC) ═══════════════════
+let tvPeer=null,tvConn=null,tvRole=null;// 'phone' or 'tv'
+const TV_SEND_FPS=20;// send game state 20 times/sec
+let tvSendInterval=null;
+
+function generateCode(){return Math.random().toString(36).substring(2,6).toUpperCase()}
+
+function showTvOverlay(){
+    document.getElementById('startOv').classList.add('hidden');
+    document.getElementById('tvOv').style.display='flex';
+    document.getElementById('tvChoose').style.display='';
+    document.getElementById('tvPhone').style.display='none';
+    document.getElementById('tvTV').style.display='none';
+}
+
+// PHONE MODE: create peer, wait for TV to connect
+function tvStartPhone(){
+    document.getElementById('tvChoose').style.display='none';
+    document.getElementById('tvPhone').style.display='';
+    const code=generateCode();
+    document.getElementById('tvCode').textContent=code;
+    const pageUrl=location.href.split('#')[0]+'#tv';
+    document.getElementById('tvUrl').textContent=pageUrl;
+    document.getElementById('tvStatus').textContent='Waiting for TV...';
+    if(typeof Peer==='undefined'){document.getElementById('tvStatus').textContent='PeerJS not loaded. Use screen mirroring.';return}
+    tvPeer=new Peer('run3d-'+code,{debug:0});
+    tvPeer.on('open',()=>{document.getElementById('tvStatus').textContent='Room ready! Code: '+code});
+    tvPeer.on('connection',conn=>{
+        tvConn=conn;tvRole='phone';
+        document.getElementById('tvStatus').textContent='📺 TV Connected!';
+        conn.on('open',()=>{
+            // Start sending game state
+            document.getElementById('tvStatus').textContent='📺 Connected! Starting game...';
+            setTimeout(()=>{document.getElementById('tvOv').style.display='none';goToCharSelect()},1000);
+            tvSendInterval=setInterval(()=>{
+                if(!tvConn||!tvConn.open)return;
+                try{tvConn.send(JSON.stringify({
+                    type:'state',
+                    score:Math.floor(G.score),combo:G.combo,energy:G.energy,
+                    lv:G.lv,sub:G.sub,nC:G.nC,speed:G.speed,
+                    st:G.st,theme:G.theme,
+                    px:chr?chr.position.x:0,py:chr?chr.position.y:0,
+                    lane:G.pl.lane,tgt:G.pl.tgt,jump:G.pl.jump,duck:G.pl.duck,
+                    charIdx:G.selectedChar
+                }))}catch(e){}
+            },1000/TV_SEND_FPS);
+        });
+        conn.on('data',d=>{
+            // TV can send back commands if needed
+            try{const msg=JSON.parse(d);if(msg.type==='input'){/* future: TV remote input */}}catch(e){}
+        });
+        conn.on('close',()=>{document.getElementById('tvStatus').textContent='TV disconnected';if(tvSendInterval)clearInterval(tvSendInterval)});
+    });
+    tvPeer.on('error',e=>{document.getElementById('tvStatus').textContent='Error: '+e.type});
+}
+
+// TV MODE: connect to phone's peer
+function tvStartTV(){
+    document.getElementById('tvChoose').style.display='none';
+    document.getElementById('tvTV').style.display='';
+}
+
+function tvConnect(){
+    const code=document.getElementById('tvInput').value.trim().toUpperCase();
+    if(!code){document.getElementById('tvTVStatus').textContent='Enter the code from phone';return}
+    if(typeof Peer==='undefined'){document.getElementById('tvTVStatus').textContent='PeerJS not loaded';return}
+    document.getElementById('tvTVStatus').textContent='Connecting...';
+    tvPeer=new Peer(undefined,{debug:0});
+    tvPeer.on('open',()=>{
+        tvConn=tvPeer.connect('run3d-'+code,{reliable:true});
+        tvConn.on('open',()=>{
+            tvRole='tv';
+            document.getElementById('tvTVStatus').textContent='Connected to phone!';
+            // Switch to TV display mode
+            setTimeout(()=>{
+                document.getElementById('tvOv').style.display='none';
+                document.getElementById('startOv').classList.add('hidden');
+                // Show full-screen game display
+                document.getElementById('game').style.display='block';
+                document.getElementById('hud').style.display='';
+                document.getElementById('hudR').style.display='';
+                // Hide camera box on TV
+                document.getElementById('camBox').style.display='none';
+                document.getElementById('gest').style.display='none';
+                // Enter fullscreen
+                try{document.documentElement.requestFullscreen()}catch(e){}
+            },500);
+        });
+        tvConn.on('data',d=>{
+            try{
+                const msg=JSON.parse(d);
+                if(msg.type==='state'){
+                    // Update HUD on TV from phone's game state
+                    document.getElementById('hSc').textContent=msg.score.toLocaleString();
+                    document.getElementById('hLv').textContent=msg.lv+'-'+msg.sub;
+                    document.getElementById('efill').style.width=msg.energy+'%';
+                    document.getElementById('hCn').textContent=msg.nC;
+                    if(msg.combo>1){document.getElementById('comboBox').style.display='';document.getElementById('hCo').textContent='x'+msg.combo}
+                    else document.getElementById('comboBox').style.display='none';
+                    // Move character on TV scene
+                    if(chr){chr.position.x=msg.px;chr.position.y=msg.py}
+                    // Apply theme if changed
+                    if(msg.theme!==G.theme)applyTheme(msg.theme);
+                    G.st=msg.st;G.speed=msg.speed;G.score=msg.score;
+                    G.lv=msg.lv;G.combo=msg.combo;G.energy=msg.energy;
+                    // Update road scroll
+                    roadTex.offset.y-=msg.speed*0.016*2.5;
+                }
+            }catch(e){}
+        });
+        tvConn.on('close',()=>{document.getElementById('tvTVStatus').textContent='Phone disconnected'});
+    });
+    tvPeer.on('error',e=>{document.getElementById('tvTVStatus').textContent='Error: '+e.type});
+}
+
+// Mirror mode - just go fullscreen
+function tvMirror(){
+    document.getElementById('tvOv').style.display='none';
+    document.getElementById('startOv').classList.remove('hidden');
+    try{document.documentElement.requestFullscreen()}catch(e){}
+}
+
+// Button handlers
+document.getElementById('tvBtn').addEventListener('click',showTvOverlay);
+document.getElementById('tvAsPhone').addEventListener('click',tvStartPhone);
+document.getElementById('tvAsTV').addEventListener('click',tvStartTV);
+document.getElementById('tvConnectBtn').addEventListener('click',tvConnect);
+document.getElementById('tvInput').addEventListener('keydown',e=>{if(e.key==='Enter')tvConnect()});
+document.getElementById('tvMirrorBtn').addEventListener('click',tvMirror);
+document.getElementById('tvCancelBtn').addEventListener('click',()=>{
+    if(tvPeer){try{tvPeer.destroy()}catch(e){}}tvPeer=null;tvConn=null;
+    document.getElementById('tvOv').style.display='none';document.getElementById('startOv').classList.remove('hidden');
+});
+document.getElementById('tvBackBtn').addEventListener('click',()=>{
+    document.getElementById('tvTV').style.display='none';document.getElementById('tvChoose').style.display='';
+});
+
+// Auto-detect if URL has #tv hash - go straight to TV mode
+if(location.hash==='#tv'){
+    setTimeout(()=>{showTvOverlay();tvStartTV()},500);
+}
+
 lt.textContent='Ready!';requestAnimationFrame(loop);initPose();
 // Load 3D models in background
 lt.textContent='Loading 3D characters...';
