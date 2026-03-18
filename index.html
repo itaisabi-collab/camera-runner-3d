@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>RUN! 3D - Ultimate Camera Runner</title>
+    <meta name="description" content="3D endless runner with camera body tracking! Choose from 11 characters and run through the city.">
+    <meta name="theme-color" content="#0a0020">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
+    <link rel="preconnect" href="https://0.peerjs.com" crossorigin>
+    <link rel="manifest" href="manifest.json">
+    <!-- OG tags for sharing -->
+    <meta property="og:title" content="RUN! 3D - Camera Runner Game">
+    <meta property="og:description" content="Run with your BODY! Camera tracks your movement. 11 characters, 6 stages. Can you beat the high score?">
+    <meta property="og:type" content="website">
     <style>
         *{margin:0;padding:0;box-sizing:border-box;touch-action:none}
         html,body{width:100%;height:100%;overflow:hidden;background:#0a0020;font-family:'Segoe UI',sans-serif;user-select:none}
@@ -193,6 +205,8 @@
 </div>
 <script>
 window.onerror=function(m,u,l){const e=document.getElementById('errBox');e.style.display='block';e.textContent=m+' (L'+l+')'};
+// Register Service Worker for offline/caching
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 </script>
 <script>
 async function loadScript(u){return new Promise((r,j)=>{const s=document.createElement('script');s.src=u;s.crossOrigin='anonymous';s.onload=r;s.onerror=j;document.head.appendChild(s)})}
