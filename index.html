@@ -1497,18 +1497,32 @@ function update(dt){
 function goToCharSelect(){
     document.getElementById('startOv').classList.add('hidden');
     document.getElementById('goOv').style.display='none';
+    document.getElementById('calOv').style.display='none';
+    stopMusic();
     // Clean up any previous carousel
     destroyCharSelect();
     document.getElementById('charSelectOv').style.display='flex';
     // Small delay to ensure DOM is rendered with correct dimensions
-    setTimeout(()=>initCharSelect(),50);
+    try{setTimeout(()=>initCharSelect(),100)}catch(e){console.error('Carousel init error:',e)}
 }
 function quickRestart(){
-    document.getElementById('goOv').style.display='none';
-    spawnActiveChar();
-    try{getAC().resume()}catch(e){}
-    try{startMusic()}catch(e){}
-    beginPlay();
+    try{
+        document.getElementById('goOv').style.display='none';
+        document.getElementById('charSelectOv').style.display='none';
+        document.getElementById('calOv').style.display='none';
+        document.getElementById('startOv').classList.add('hidden');
+        stopMusic();
+        spawnActiveChar();
+        try{getAC().resume()}catch(e){}
+        try{startMusic()}catch(e){}
+        beginPlay();
+    }catch(err){
+        console.error('Restart error:',err);
+        // Fallback - force reset
+        G.selectedChar=0;
+        spawnActiveChar();
+        beginPlay();
+    }
 }
 function selectAndStart(){
     document.getElementById('charSelectOv').style.display='none';
@@ -1521,6 +1535,9 @@ function selectAndStart(){
 }
 function finCal(){const s=G.cal.samples;if(s.length>3){const av=fn=>s.reduce((a,p)=>a+fn(p),0)/s.length;G.pose.bx=av(p=>p.x);G.pose.bShY=av(p=>p.shY);G.pose.bNY=av(p=>p.nY);G.pose.sx=G.pose.bx;G.pose.sShY=G.pose.bShY;G.pose.sNY=G.pose.bNY;G.pose.slwY=av(p=>p.lwY);G.pose.srwY=av(p=>p.rwY)}document.getElementById('calOv').style.display='none';beginPlay()}
 function beginPlay(){
+    // Cancel any pending game-over popup & hide all overlays
+    if(goTimeout){clearTimeout(goTimeout);goTimeout=null}
+    document.getElementById('goOv').style.display='none';
     G.st='playing';G.score=0;G.speed=C.SPD0;G.time=0;G.spawnT=0;G.combo=0;G.mxC=0;G.nC=0;G.lv=1;G.sub=1;G.energy=100;G.particles=[];
     G.streak=0;G.bestStreak=0;G.pu={shield:0,magnet:0,slowmo:0,x2:0};collectedPUTypes=new Set();
     G.pl={lane:1,tgt:1,disp:1,jump:false,duck:false,jt:0,dt:0,rf:0,y:0};
@@ -1532,7 +1549,9 @@ function beginPlay(){
     document.getElementById('hud').style.display='';document.getElementById('hudR').style.display='';
     document.getElementById('comboFire').style.height='0';document.getElementById('streak').style.display='none';
 }
+let goTimeout=null;
 function gameOver(){
+    if(G.st==='over')return;// prevent double game-over
     G.st='over';sfxHit();stopMusic();triggerShake(3);flashScreen('rgba(255,30,30,.3)',400);
     spawnParts(chr.position.x,3,0,0xff2244,25);spawnParts(chr.position.x,3,0,0xffaa00,15);
     G.totalCoins+=G.nC;localStorage.setItem('r3TC',G.totalCoins);
@@ -1544,7 +1563,8 @@ function gameOver(){
     document.getElementById('bTxt').innerHTML=isNR?'<span style="color:#FFD700">★ New best! ★</span>':'Best: '+G.best.toLocaleString();
     document.getElementById('hud').style.display='none';document.getElementById('hudR').style.display='none';
     document.getElementById('comboFire').style.height='0';document.getElementById('speedLines').style.opacity='0';document.getElementById('streak').style.display='none';document.getElementById('powerUpHud').style.display='none';
-    setTimeout(()=>document.getElementById('goOv').style.display='flex',500);
+    if(goTimeout)clearTimeout(goTimeout);
+    goTimeout=setTimeout(()=>{if(G.st==='over')document.getElementById('goOv').style.display='flex'},500);
 }
 
 // ═══════════════════ RENDER LOOP ═══════════════════
