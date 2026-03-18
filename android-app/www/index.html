@@ -198,6 +198,7 @@
     <p id="bTxt"></p>
     <div class="go-stats" id="goStats"></div>
     <div id="goButtons">
+        <button class="btn" id="continueAdBtn" style="background:linear-gradient(135deg,#FFD700,#FF6B35);margin-bottom:8px">🎬 Continue (Watch Ad)</button><br>
         <button class="btn" id="quickReBtn">🔄 PLAY AGAIN</button><br>
         <button class="share-btn" id="reBtn">🎭 Change Character</button>
         <button class="share-btn" id="shareBtn" onclick="shareScore()">📤 Share Score</button>
@@ -318,16 +319,16 @@ const CHAR_DATA=[
     {name:'Tung Tung Sahur',icon:'🥁',desc:'The legendary drummer',ability:'🎪 Bouncy Beat',
      colors:{body:0xff2255,accent:0xffd700,glow:0xff4488},
      anim:{armSwing:1.1,legKick:1.0,bodyBob:2.0,hatWobble:true,bigFeet:true}},
-    {name:'Brr Brr Patapim',icon:'❄️',desc:'Frozen crystal warrior',ability:'🧊 Ice Power',
+    {name:'Brr Brr Patapim',icon:'❄️',desc:'Frozen crystal warrior',ability:'🧊 Ice Power',locked:true,unlockCost:500,
      colors:{body:0x88ccff,accent:0x00e5ff,glow:0x44eeff},
      anim:{armSwing:0.7,legKick:0.7,bodyBob:0.5,crystalRotate:true,slowMotion:true}},
     {name:'Lirili Larila',icon:'🌸',desc:'Flower spirit dancer',ability:'🌺 Petal Dance',
      colors:{body:0xffaacc,accent:0xff66aa,glow:0xff88cc},
      anim:{armSwing:0.9,legKick:0.9,bodyBob:0.8,petalFlutter:true,sway:true}},
-    {name:'Trippi Troppi',icon:'🌈',desc:'Chaotic rainbow energy',ability:'🎨 Color Burst',
+    {name:'Trippi Troppi',icon:'🌈',desc:'Chaotic rainbow energy',ability:'🎨 Color Burst',locked:true,unlockCost:1000,
      colors:{body:0xff4444,accent:0x44ff44,glow:0xffff44},
      anim:{armSwing:1.2,legKick:1.2,bodyBob:1.5,colorCycle:true,chaotic:true}},
-    {name:'La Vaca Saturno',icon:'🐄',desc:'Space cow from Saturn',ability:'🪐 Cosmic Moo',
+    {name:'La Vaca Saturno',icon:'🐄',desc:'Space cow from Saturn',ability:'🪐 Cosmic Moo',locked:true,unlockCost:750,
      colors:{body:0xeeeeee,accent:0x222222,glow:0xaabbff},
      anim:{armSwing:0.8,legKick:0.9,bodyBob:1.0,ringRotate:true,spots:true}}
 ];
@@ -1087,10 +1088,11 @@ function updateCharPreview(){
     }
     csScene.add(csChar);
     const cd=CHAR_DATA[G.selectedChar];
-    document.getElementById('charName').textContent=cd.icon+' '+cd.name;
-    document.getElementById('charName').style.color=`#${cd.colors.glow.toString(16).padStart(6,'0')}`;
-    document.getElementById('charDesc').textContent=cd.desc;
-    document.getElementById('charAbility').textContent=cd.ability;
+    const locked=cd.locked&&!isCharUnlocked(G.selectedChar);
+    document.getElementById('charName').textContent=(locked?'🔒 ':cd.icon+' ')+cd.name;
+    document.getElementById('charName').style.color=locked?'#888':`#${cd.colors.glow.toString(16).padStart(6,'0')}`;
+    document.getElementById('charDesc').textContent=locked?`Unlock: ${cd.unlockCost} coins or watch ad`:cd.desc;
+    document.getElementById('charAbility').textContent=locked?`🔒 ${cd.unlockCost} coins`:cd.ability;
     document.querySelectorAll('.char-dot').forEach((d,i)=>d.classList.toggle('active',i===G.selectedChar));
     localStorage.setItem('r3Ch',G.selectedChar);
     // Setup carousel AnimationMixer for GLB characters
@@ -1629,7 +1631,7 @@ function beginPlay(){
     G.obs.forEach(o=>{sc.remove(o.mesh);retObs(o.type,o.mesh)});G.coins.forEach(c=>{sc.remove(c.mesh);retCoin(c.mesh)});G.powerups.forEach(p=>sc.remove(p.mesh));
     G.obs=[];G.coins=[];G.powerups=[];chr.position.set(0,0,0);chr.scale.y=1;
     // Reset difficulty
-    rtSpawnMin=C.SPAWN_MIN;rtSpdMax=C.SPD_MAX;
+    rtSpawnMin=C.SPAWN_MIN;rtSpdMax=C.SPD_MAX;continueUsed=false;
     // Reset environment positions & road texture
     for(let i=0;i<envObjects.length;i++)envObjects[i].position.z=envOrigZ[i];
     roadTex.offset.y=0;
@@ -1642,7 +1644,10 @@ function gameOver(){
     G.st='over';sfxHit();stopMusic();triggerShake(3);flashScreen('rgba(255,30,30,.3)',400);
     spawnParts(chr.position.x,3,0,0xff2244,25);spawnParts(chr.position.x,3,0,0xffaa00,15);
     G.totalCoins+=G.nC;localStorage.setItem('r3TC',G.totalCoins);
+    addToWallet(G.nC);// coins go to persistent wallet for unlocks
     const s=Math.floor(G.score),isNR=s>G.best;if(isNR){G.best=s;localStorage.setItem('r3B',s)}
+    // Show/hide continue button
+    document.getElementById('continueAdBtn').style.display=continueUsed?'none':'';
     dom.fSc.textContent=s.toLocaleString();
     dom.goTitle.innerHTML=isNR?'🎉 NEW RECORD!':'💥 Game Over';
     dom.fSc.classList.toggle('new-record',isNR);
@@ -1663,13 +1668,134 @@ let tX=0,tY=0,tT=0;
 addEventListener('touchstart',e=>{if(e.target.closest('.btn,.btn-nav,.ov,.share-btn,.char-dot'))return;tX=e.touches[0].clientX;tY=e.touches[0].clientY;tT=Date.now()},{passive:true});
 addEventListener('touchend',e=>{if(G.st!=='playing'||e.target.closest('.btn,.btn-nav,.ov,.share-btn,.char-dot'))return;const dx=e.changedTouches[0].clientX-tX,dy=e.changedTouches[0].clientY-tY;if(Date.now()-tT>500)return;const p=G.pl;if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>25){if(dx>0)p.tgt=Math.min(2,p.tgt+1);else p.tgt=Math.max(0,p.tgt-1)}else if(Math.abs(dy)>25){if(dy<0&&!p.jump&&!p.duck){p.jump=true;p.jt=C.JUMP_D;sfxJump()}else if(dy>0&&!p.jump&&!p.duck){p.duck=true;p.dt=C.DUCK_D}}},{passive:true});
 
+// ═══════════════════ MONETIZATION & ADS ═══════════════════
+let adMobReady=false,continueUsed=false;
+const walletKey='r3Wallet';
+let wallet=+localStorage.getItem(walletKey)||0;// persistent coin wallet
+const unlockedKey='r3Unlocked';
+let unlockedChars=JSON.parse(localStorage.getItem(unlockedKey)||'[]');
+
+// Initialize AdMob (Capacitor native)
+async function initAdMob(){
+    if(typeof Capacitor==='undefined'||!Capacitor.Plugins?.AdMob)return;
+    try{
+        const {AdMob}=Capacitor.Plugins;
+        await AdMob.initialize({});
+        // Rewarded ad - "continue playing" / "unlock character"
+        await AdMob.prepareRewardVideoAd({adId:'ca-app-pub-XXXX/YYYY'});// REPLACE with real AdMob ID
+        // Interstitial - between games
+        await AdMob.prepareInterstitial({adId:'ca-app-pub-XXXX/ZZZZ'});// REPLACE with real AdMob ID
+        adMobReady=true;
+        console.log('AdMob ready!');
+    }catch(e){console.log('AdMob not available (web mode):',e)}
+}
+
+// Show rewarded ad - returns true if user watched
+async function showRewardedAd(){
+    if(adMobReady&&typeof Capacitor!=='undefined'){
+        try{
+            const {AdMob}=Capacitor.Plugins;
+            const result=await AdMob.showRewardVideoAd();
+            await AdMob.prepareRewardVideoAd({adId:'ca-app-pub-XXXX/YYYY'});
+            return true;
+        }catch(e){return false}
+    }
+    // Web fallback: simulate ad with a timer
+    return new Promise(resolve=>{
+        const adDiv=document.createElement('div');
+        adDiv.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;z-index:999;background:rgba(0,0,0,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-family:sans-serif';
+        let sec=5;
+        adDiv.innerHTML=`<p style="font-size:1.2em;color:rgba(255,255,255,.5)">📺 Ad would play here</p>
+            <p style="font-size:3em;font-weight:bold;margin:20px 0" id="adTimer">${sec}</p>
+            <p style="color:rgba(255,255,255,.4)">In the app version, a real ad plays here</p>`;
+        document.body.appendChild(adDiv);
+        const ti=setInterval(()=>{sec--;document.getElementById('adTimer').textContent=sec;
+            if(sec<=0){clearInterval(ti);adDiv.remove();resolve(true)}},1000);
+    });
+}
+
+// Show interstitial between games
+async function showInterstitial(){
+    if(!adMobReady||typeof Capacitor==='undefined')return;
+    try{
+        const {AdMob}=Capacitor.Plugins;
+        await AdMob.showInterstitial();
+        await AdMob.prepareInterstitial({adId:'ca-app-pub-XXXX/ZZZZ'});
+    }catch(e){}
+}
+
+// Continue from where you died (rewarded ad)
+async function continueWithAd(){
+    if(continueUsed)return;// only once per game
+    const watched=await showRewardedAd();
+    if(watched){
+        continueUsed=true;
+        dom.goOv.style.display='none';
+        G.energy=50;// restore half energy
+        G.st='playing';
+        try{startMusic()}catch(e){}
+        // Give brief invincibility
+        G.pu.shield=3;
+        document.getElementById('continueAdBtn').style.display='none';
+    }
+}
+
+// Unlock character with coins or ad
+function isCharUnlocked(idx){
+    const cd=CHAR_DATA[idx];
+    if(!cd.locked)return true;
+    return unlockedChars.includes(idx);
+}
+
+function unlockChar(idx){
+    if(!unlockedChars.includes(idx)){
+        unlockedChars.push(idx);
+        localStorage.setItem(unlockedKey,JSON.stringify(unlockedChars));
+    }
+}
+
+async function tryUnlockChar(idx){
+    const cd=CHAR_DATA[idx];
+    if(!cd.locked||isCharUnlocked(idx))return true;
+    // Option 1: spend coins
+    if(wallet>=cd.unlockCost){
+        if(confirm(`Unlock ${cd.name} for ${cd.unlockCost} coins?\nYou have: ${wallet} coins`)){
+            wallet-=cd.unlockCost;
+            localStorage.setItem(walletKey,wallet);
+            unlockChar(idx);
+            return true;
+        }
+        return false;
+    }
+    // Option 2: watch ad
+    if(confirm(`Unlock ${cd.name}?\nWatch an ad to unlock for free!`)){
+        const watched=await showRewardedAd();
+        if(watched){unlockChar(idx);return true}
+    }
+    return false;
+}
+
+// Add earned coins to wallet after each game
+function addToWallet(coins){
+    wallet+=coins;
+    localStorage.setItem(walletKey,wallet);
+}
+
 // ═══════════════════ INIT ═══════════════════
 document.getElementById('startBtn').addEventListener('click',goToCharSelect);
-document.getElementById('selectChar').addEventListener('click',selectAndStart);
+document.getElementById('selectChar').addEventListener('click',async()=>{
+    // Check if selected character is locked
+    if(!isCharUnlocked(G.selectedChar)){
+        const unlocked=await tryUnlockChar(G.selectedChar);
+        if(!unlocked)return;// don't start if not unlocked
+    }
+    selectAndStart();
+});
 document.getElementById('prevChar').addEventListener('click',()=>{G.selectedChar=(G.selectedChar-1+CHAR_DATA.length)%CHAR_DATA.length;updateCharPreview()});
 document.getElementById('nextChar').addEventListener('click',()=>{G.selectedChar=(G.selectedChar+1)%CHAR_DATA.length;updateCharPreview()});
 document.getElementById('reBtn').addEventListener('click',()=>goToCharSelect());
-document.getElementById('quickReBtn').addEventListener('click',()=>quickRestart());
+document.getElementById('quickReBtn').addEventListener('click',()=>{showInterstitial();quickRestart()});
+document.getElementById('continueAdBtn').addEventListener('click',()=>continueWithAd());
 
 // ═══════════════════ TV MODE (PeerJS WebRTC) ═══════════════════
 let tvPeer=null,tvConn=null,tvRole=null;// 'phone' or 'tv'
@@ -1801,7 +1927,7 @@ if(location.hash==='#tv'){
     setTimeout(()=>{showTvOverlay();tvStartTV()},500);
 }
 
-lt.textContent='Ready!';requestAnimationFrame(loop);initPose();
+lt.textContent='Ready!';requestAnimationFrame(loop);initPose();initAdMob();
 // Load 3D models in background
 lt.textContent='Loading 3D characters...';
 loadGLBModels().then(()=>{
