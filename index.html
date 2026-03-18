@@ -369,59 +369,56 @@ for(const lx of LX){
 
 // ═══════════════════ URBAN ENVIRONMENT ═══════════════════
 const bulbMeshes=[];
-// Signal posts & overhead power lines
+// All scrolling environment objects tracked here
+const envObjects=[];// {mesh, resetZ} - objects that scroll forward and wrap
+const ENV_WRAP_FRONT=-320;// where objects reset to (far ahead)
+const ENV_WRAP_BACK=40;// when objects pass this Z, they wrap
+// Signal posts & overhead power lines - ALL IN GROUPS for scrolling
 const metalMat=new THREE.MeshStandardMaterial({color:0x666666,metalness:0.7,roughness:0.3});
 const signalColors=[0xff0000,0x00ff00,0xffaa00,0xff0000,0x00ff00];
 for(let i=0;i<25;i++){
     const z=-i*12+15,side=i%2?-1:1,x=side*(RW/2+1.5);
-    // Signal post
+    const grp=new THREE.Group();grp.position.set(x,0,z);
     const post=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.12,7,6),metalMat);
-    post.position.set(x,3.5,z);sc.add(post);
-    // Cross arm
+    post.position.y=3.5;grp.add(post);
     const arm=new THREE.Mesh(new THREE.BoxGeometry(3,0.08,0.08),metalMat);
-    arm.position.set(x,7,z);sc.add(arm);
-    // Signal light
+    arm.position.y=7;grp.add(arm);
     const sc1=signalColors[i%signalColors.length];
     const signal=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8),new THREE.MeshBasicMaterial({color:sc1}));
-    signal.position.set(x,6.5,z);sc.add(signal);bulbMeshes.push(signal);
-    // Overhead wire
-    if(i>0){
-        const wire=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,12,4),metalMat);
-        wire.rotation.x=Math.PI/2;wire.position.set(x,7,z+6);sc.add(wire);
-    }
-    // Point lights for atmosphere
-    if(i%4===0){const pl=new THREE.PointLight(0xffddaa,0.6,15);pl.position.set(x,6,z);sc.add(pl)}
+    signal.position.y=6.5;grp.add(signal);bulbMeshes.push(signal);
+    if(i%4===0){const pl=new THREE.PointLight(0xffddaa,0.6,15);pl.position.y=6;grp.add(pl)}
+    sc.add(grp);envObjects.push(grp);
 }
 
-// City lamp posts between tracks
+// City lamp posts
 for(let i=0;i<20;i++){
     const z=-i*15+10,side=i%2?-1:1,x=side*(RW/2+4);
+    const grp=new THREE.Group();grp.position.set(x,0,z);
     const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,5,6),metalMat);
-    pole.position.set(x,2.5,z);sc.add(pole);
-    // Lamp head
+    pole.position.y=2.5;grp.add(pole);
     const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,8),new THREE.MeshBasicMaterial({color:0xffffcc}));
-    lamp.position.set(x,5.2,z);sc.add(lamp);
-    const ll=new THREE.PointLight(0xffeecc,0.5,12);ll.position.set(x,5,z);sc.add(ll);
+    lamp.position.y=5.2;grp.add(lamp);
+    const ll=new THREE.PointLight(0xffeecc,0.5,12);ll.position.y=5;grp.add(ll);
+    sc.add(grp);envObjects.push(grp);
 }
 
-// City trees (realistic green)
+// City trees
 for(let i=0;i<30;i++){
     const side=i%2?-1:1,z=-i*9+20+Math.random()*3;
     const x=side*(RW/2+5+Math.random()*6);
-    // Brown trunk
+    const grp=new THREE.Group();grp.position.set(x,0,z);
     const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.22,3,6),
         new THREE.MeshStandardMaterial({color:0x5c3d1e,roughness:0.8}));
-    trunk.position.set(x,1.5,z);sc.add(trunk);
-    // Green crown (multiple spheres for volume)
+    trunk.position.y=1.5;grp.add(trunk);
     const greens=[0x2d5a1e,0x3a7a28,0x4a8a33,0x2e6b20];
     for(let j=0;j<3;j++){
-        const gc=greens[j%greens.length];
         const crown=new THREE.Mesh(new THREE.SphereGeometry(1.2+Math.random()*0.8,8,8),
-            new THREE.MeshStandardMaterial({color:gc,roughness:0.7}));
-        crown.position.set(x+(Math.random()-0.5)*0.8,3.5+j*0.6+Math.random()*0.5,z+(Math.random()-0.5)*0.5);
+            new THREE.MeshStandardMaterial({color:greens[j%4],roughness:0.7}));
+        crown.position.set((Math.random()-0.5)*0.8,3.5+j*0.6+Math.random()*0.5,(Math.random()-0.5)*0.5);
         crown.scale.set(0.8+Math.random()*0.4,0.7+Math.random()*0.5,0.8+Math.random()*0.4);
-        sc.add(crown);
+        grp.add(crown);
     }
+    sc.add(grp);envObjects.push(grp);
 }
 
 // CITY BUILDINGS (rectangular, with windows!)
@@ -455,39 +452,35 @@ for(let i=0;i<40;i++){
     const side=i%2?-1:1;
     const h=12+Math.random()*40,w=3+Math.random()*5,d=3+Math.random()*4;
     const z=-i*8+30+Math.random()*4,x=side*(RW/2+4+Math.random()*15);
+    const grp=new THREE.Group();grp.position.set(x,0,z);
     const col=bldgColors[i%bldgColors.length];
     const tex=mkBuildingTex(w,h,col);
     tex.repeat.set(Math.ceil(w/4),Math.ceil(h/8));
     const bld=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
         new THREE.MeshStandardMaterial({map:tex,roughness:0.8}));
-    bld.position.set(x,h/2,z);bld.castShadow=true;sc.add(bld);
-    // Rooftop details
-    if(Math.random()>0.5){// Water tank
-        const tank=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.5,8),
-            new THREE.MeshStandardMaterial({color:0x555555,metalness:0.5,roughness:0.4}));
-        tank.position.set(x+(Math.random()-0.5)*w*0.3,h+0.75,z);sc.add(tank);
-    }
-    if(Math.random()>0.6){// AC unit
-        const ac=new THREE.Mesh(new THREE.BoxGeometry(1,0.6,0.8),
-            new THREE.MeshStandardMaterial({color:0x888888,roughness:0.5}));
-        ac.position.set(x+(Math.random()-0.5)*w*0.3,h+0.3,z+(Math.random()-0.5)*d*0.3);sc.add(ac);
-    }
+    bld.position.y=h/2;bld.castShadow=true;grp.add(bld);
+    if(Math.random()>0.5){const tank=new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.5,8),
+        new THREE.MeshStandardMaterial({color:0x555555,metalness:0.5,roughness:0.4}));
+        tank.position.set((Math.random()-0.5)*w*0.3,h+0.75,0);grp.add(tank)}
+    if(Math.random()>0.6){const ac=new THREE.Mesh(new THREE.BoxGeometry(1,0.6,0.8),
+        new THREE.MeshStandardMaterial({color:0x888888,roughness:0.5}));
+        ac.position.set((Math.random()-0.5)*w*0.3,h+0.3,(Math.random()-0.5)*d*0.3);grp.add(ac)}
+    sc.add(grp);envObjects.push(grp);
 }
 
 // Graffiti walls & fences near tracks
 for(let i=0;i<15;i++){
     const z=-i*18+10,side=i%2?-1:1,x=side*(RW/2+2);
-    // Concrete wall
+    const grp=new THREE.Group();grp.position.set(x,0,z);
     const wallH=2+Math.random()*1.5;
-    const wallMat=new THREE.MeshStandardMaterial({color:0x888880,roughness:0.9});
-    const wall=new THREE.Mesh(new THREE.BoxGeometry(0.3,wallH,5+Math.random()*5),wallMat);
-    wall.position.set(x,wallH/2,z);wall.castShadow=true;sc.add(wall);
-    // Colorful graffiti stripe
+    const wall=new THREE.Mesh(new THREE.BoxGeometry(0.3,wallH,5+Math.random()*5),
+        new THREE.MeshStandardMaterial({color:0x888880,roughness:0.9}));
+    wall.position.y=wallH/2;wall.castShadow=true;grp.add(wall);
     const grafColors=[0xff4444,0x44aaff,0xffaa00,0x44ff44,0xff44ff,0x44ffff];
-    const gc=grafColors[Math.floor(Math.random()*grafColors.length)];
     const graf=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.8+Math.random(),3+Math.random()*2),
-        new THREE.MeshBasicMaterial({color:gc,transparent:true,opacity:0.7}));
-    graf.position.set(x,wallH*0.5+Math.random()*0.5,z+(Math.random()-0.5)*2);sc.add(graf);
+        new THREE.MeshBasicMaterial({color:grafColors[Math.floor(Math.random()*grafColors.length)],transparent:true,opacity:0.7}));
+    graf.position.set(0,wallH*0.5+Math.random()*0.5,(Math.random()-0.5)*2);grp.add(graf);
+    sc.add(grp);envObjects.push(grp);
 }
 
 // Parked train cars (static decoration on sides)
@@ -519,7 +512,7 @@ for(let i=0;i<6;i++){
     const roof=new THREE.Mesh(new THREE.BoxGeometry(3.6,0.15,16.1),
         new THREE.MeshStandardMaterial({color:0x444444,metalness:0.5}));
     roof.position.y=3.8;tg.add(roof);
-    tg.position.set(x,0,z);sc.add(tg);
+    tg.position.set(x,0,z);sc.add(tg);envObjects.push(tg);
 }
 
 // ═══════════════════ CHARACTER BUILDERS ═══════════════════
@@ -1445,6 +1438,11 @@ function update(dt){
     const sEl=document.getElementById('streak');if(G.streak>=5){sEl.style.display='block';document.getElementById('streakCount').textContent=G.streak;document.getElementById('streakFire').textContent=G.streak>=20?'🔥🔥🔥':G.streak>=10?'🔥🔥':'🔥'}else sEl.style.display='none';
 
     const spd=G.speed*eDt*60;
+    // Scroll environment objects (buildings, trees, posts etc.)
+    for(let i=0;i<envObjects.length;i++){
+        const e=envObjects[i];e.position.z+=spd;
+        if(e.position.z>ENV_WRAP_BACK)e.position.z+=ENV_WRAP_FRONT-ENV_WRAP_BACK;
+    }
     // Obstacles
     for(let i=G.obs.length-1;i>=0;i--){const o=G.obs[i];o.mesh.position.z+=spd;if(o.type===OT.BLK&&o.mesh.children[1])o.mesh.children[1].rotation.z+=eDt*3;
     if(!o.passed&&Math.abs(o.mesh.position.z)<2){const pL=Math.round(pl.disp);let hit=false;if(o.type===OT.BLK)hit=o.lanes.includes(pL)&&!pl.jump;else if(o.type===OT.LOW)hit=!pl.jump;else hit=!pl.duck;
