@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__fill",
+      "mcp__chrome-devtools__wait_for",
+      "Read(//tmp/**)",
+      "Read(//g/tmp/**)",
+      "Bash(unzip -o RUN3D-release-aab.zip)",
+      "Bash(ls -la *.aab)",
+      "mcp__chrome-devtools__list_pages",
+      "Bash(keytool -genkeypair -v -keystore release-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias run3d -storepass run3dcamera2026 -keypass run3dcamera2026 -dname \"CN=Itaisa, OU=Games, O=Itaisa, L=Israel, ST=Israel, C=IL\")",
+      "Bash(\"/c/Program Files/JetBrains/IntelliJ IDEA 2025.3.3/jbr/bin/keytool.exe\" -genkeypair -v -keystore release-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias run3d -storepass run3dcamera2026 -keypass run3dcamera2026 -dname \"CN=Itaisa, OU=Games, O=Itaisa, L=Israel, ST=Israel, C=IL\")",
+      "Bash(gh secret:*)",
+      "mcp__chrome-devtools__press_key"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}
