@@ -180,7 +180,7 @@
     <h2 style="font-size:2em;margin-bottom:10px">How to Play?</h2>
     <p style="color:#aaa;margin-bottom:25px">Choose your control method</p>
     <div style="display:flex;flex-direction:column;gap:16px;max-width:320px;margin:0 auto">
-        <button class="btn" id="ctrlFace" style="font-size:1.2em;padding:18px;background:linear-gradient(135deg,#667eea,#764ba2)">😊 Face Camera<br><small style="color:#ddd">Tilt head left/right, raise eyebrows to jump, nod down to duck</small></button>
+        <button class="btn" id="ctrlBody" style="font-size:1.2em;padding:18px;background:linear-gradient(135deg,#667eea,#764ba2)">📷 Camera<br><small style="color:#ddd">Move your body to control - lean, raise arms, crouch</small></button>
         <button class="btn" id="ctrlSwipe" style="font-size:1.2em;padding:18px;background:linear-gradient(135deg,#f093fb,#f5576c)">👆 Touch Screen<br><small style="color:#ddd">Swipe left/right/up/down to control</small></button>
     </div>
 </div>
@@ -1904,10 +1904,10 @@ document.getElementById('quickReBtn').addEventListener('click',()=>{showIntersti
 document.getElementById('continueAdBtn').addEventListener('click',()=>continueWithAd());
 
 // Control mode selection buttons
-document.getElementById('ctrlFace').addEventListener('click',async()=>{
-    dom.controlSelectOv.style.display='none';G.controlMode='face';
+document.getElementById('ctrlBody').addEventListener('click',async()=>{
+    dom.controlSelectOv.style.display='none';G.controlMode='body';
     document.getElementById('camBox').style.display='';
-    await initPose();await initFaceMesh();startCalibrationAndPlay();
+    await initPose();startCalibrationAndPlay();
 });
 document.getElementById('ctrlSwipe').addEventListener('click',()=>{
     dom.controlSelectOv.style.display='none';G.controlMode='swipe';
