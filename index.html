@@ -177,13 +177,11 @@
     <button class="btn" id="selectChar">✅ SELECT</button>
 </div>
 <div id="controlSelectOv" class="ov" style="display:none">
-    <h2 style="font-size:2em;margin-bottom:10px">Choose Controls</h2>
-    <p style="color:#aaa;margin-bottom:20px">How do you want to play?</p>
-    <div style="display:flex;flex-direction:column;gap:12px;max-width:300px;margin:0 auto">
-        <button class="btn" id="ctrlBody" style="font-size:1.1em;padding:14px">🏃 Body Tracking<br><small style="color:#aaa">Move your whole body</small></button>
-        <button class="btn" id="ctrlFace" style="font-size:1.1em;padding:14px">😊 Face Tracking<br><small style="color:#aaa">Tilt head & raise eyebrows</small></button>
-        <button class="btn" id="ctrlTouch" style="font-size:1.1em;padding:14px">👆 Touch Buttons<br><small style="color:#aaa">Tap on-screen buttons</small></button>
-        <button class="btn" id="ctrlSwipe" style="font-size:1.1em;padding:14px">👋 Swipe Gestures<br><small style="color:#aaa">Swipe to move</small></button>
+    <h2 style="font-size:2em;margin-bottom:10px">How to Play?</h2>
+    <p style="color:#aaa;margin-bottom:25px">Choose your control method</p>
+    <div style="display:flex;flex-direction:column;gap:16px;max-width:320px;margin:0 auto">
+        <button class="btn" id="ctrlFace" style="font-size:1.2em;padding:18px;background:linear-gradient(135deg,#667eea,#764ba2)">😊 Face Camera<br><small style="color:#ddd">Tilt head left/right, raise eyebrows to jump, nod down to duck</small></button>
+        <button class="btn" id="ctrlSwipe" style="font-size:1.2em;padding:18px;background:linear-gradient(135deg,#f093fb,#f5576c)">👆 Touch Screen<br><small style="color:#ddd">Swipe left/right/up/down to control</small></button>
     </div>
 </div>
 <div id="tvOv" class="ov" style="display:none">
@@ -1454,49 +1452,72 @@ function detectG(){const p=G.pose,pl=G.pl;if(!p.ready)return;const lean=p.sx-p.b
 // ═══════════════════ FACE MESH ═══════════════════
 let fDet=null;
 async function initFaceMesh(){
-    if(typeof FaceMesh==='undefined'){gestEl.textContent='FaceMesh not available';return false}
-    gestEl.textContent='Loading face tracking...';
+    if(typeof FaceMesh==='undefined'){
+        gestEl.textContent='FaceMesh loading...';
+        // Try loading it now
+        try{await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js')}catch(e){}
+        if(typeof FaceMesh==='undefined'){gestEl.textContent='Face tracking unavailable - using body tracking';G.controlMode='body';return false}
+    }
+    gestEl.textContent='Loading face model...';
     try{
         fDet=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
-        fDet.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+        fDet.setOptions({maxNumFaces:1,refineLandmarks:false,minDetectionConfidence:0.4,minTrackingConfidence:0.4});
         fDet.onResults(onFaceResults);
-        if(vid.readyState>=2)try{await fDet.send({image:vid})}catch(e){}
-        gestEl.textContent='Face tracking ready!';
+        // Wait for video to be ready
+        await new Promise(r=>{if(vid.readyState>=2)r();else vid.addEventListener('loadeddata',r,{once:true})});
+        try{await fDet.send({image:vid})}catch(e){}
+        gestEl.textContent='Face tracking ready! Look at camera';
         (async function fLp(){if(fDet&&vid.readyState>=2)try{await fDet.send({image:vid})}catch(e){}requestAnimationFrame(fLp)})();
         return true;
-    }catch(e){gestEl.textContent='Face tracking failed';return false}
+    }catch(e){gestEl.textContent='Face tracking failed: '+e.message;return false}
 }
 function onFaceResults(r){
     if(!r.multiFaceLandmarks||!r.multiFaceLandmarks[0]){G.face.ready=false;return}
     const lm=r.multiFaceLandmarks[0],f=G.face;
     f.ready=true;f.conf=1;
-    const a=0.4;
+    const a=0.35;// smoothing factor
+    // Nose tip (landmark 1) for head position
     f.noseX=f.noseX*(1-a)+lm[1].x*a;
     f.noseY=f.noseY*(1-a)+lm[1].y*a;
-    f.browL=f.browL*(1-a)+(lm[159].y-lm[223].y)*a;
-    f.browR=f.browR*(1-a)+(lm[386].y-lm[443].y)*a;
+    // Eyebrow raise: distance between eyebrow top and eye top (bigger = raised)
+    // Left: landmarks 66(brow) vs 159(eye upper)
+    // Right: landmarks 296(brow) vs 386(eye upper)
+    const browDistL=lm[159].y-lm[66].y;
+    const browDistR=lm[386].y-lm[296].y;
+    f.browL=f.browL*(1-a)+browDistL*a;
+    f.browR=f.browR*(1-a)+browDistR*a;
+    // Draw key face points on canvas
     const w=pCvs.width,h=pCvs.height;
     pCtx.clearRect(0,0,w,h);
-    pCtx.fillStyle='rgba(0,255,180,.5)';
-    [1,4,5,6,223,443,159,386,152,10,234,454].forEach(i=>{
-        pCtx.beginPath();pCtx.arc(lm[i].x*w,lm[i].y*h,2,0,Math.PI*2);pCtx.fill();
+    pCtx.fillStyle='rgba(0,255,180,.6)';
+    [1,66,296,159,386,10,152].forEach(i=>{
+        if(lm[i]){pCtx.beginPath();pCtx.arc(lm[i].x*w,lm[i].y*h,3,0,Math.PI*2);pCtx.fill()}
     });
-    if(G.st==='cal')G.cal.samples.push({noseX:lm[1].x,noseY:lm[1].y,browL:lm[159].y-lm[223].y,browR:lm[386].y-lm[443].y});
+    // Draw nose direction line
+    pCtx.strokeStyle='rgba(255,200,0,.6)';pCtx.lineWidth=2;
+    pCtx.beginPath();pCtx.moveTo(lm[1].x*w,lm[1].y*h);pCtx.lineTo(lm[1].x*w,(lm[1].y-0.05)*h);pCtx.stroke();
+    if(G.st==='cal')G.cal.samples.push({noseX:lm[1].x,noseY:lm[1].y,browL:browDistL,browR:browDistR});
 }
 function detectFaceG(){
     const f=G.face,pl=G.pl;
     if(!f.ready)return;
+    // Head tilt left/right - nose X relative to baseline
     const lean=f.noseX-f.bNoseX;
-    if(lean>0.03)pl.tgt=0;
-    else if(lean<-0.03)pl.tgt=2;
-    else pl.tgt=1;
-    const browRaise=((f.browL+f.browR)/2)-((f.bBrowL+f.bBrowR)/2);
-    if(browRaise>0.008&&!pl.jump&&!pl.duck){pl.jump=true;pl.jt=0.6;sfxJump()}
+    if(lean>0.025)pl.tgt=0;// nose moves right in camera = go left
+    else if(lean<-0.025)pl.tgt=2;// nose moves left = go right
+    else pl.tgt=1;// center
+    // Eyebrow raise = jump
+    const avgBrow=(f.browL+f.browR)/2;
+    const baseBrow=(f.bBrowL+f.bBrowR)/2;
+    const browRaise=avgBrow-baseBrow;
+    if(browRaise>0.006&&!pl.jump&&!pl.duck){pl.jump=true;pl.jt=0.6;sfxJump()}
+    // Head nod down = duck (nose Y goes down = bigger value)
     const nod=f.noseY-f.bNoseY;
-    if(nod>0.04&&!pl.jump&&!pl.duck){pl.duck=true;pl.dt=0.5}
-    let t='center';
-    if(pl.jump)t='JUMP!';else if(pl.duck)t='DUCK!';
-    else if(pl.tgt===0)t='LEFT';else if(pl.tgt===2)t='RIGHT';
+    if(nod>0.035&&!pl.jump&&!pl.duck){pl.duck=true;pl.dt=0.5}
+    // Display current gesture
+    let t='😊 center';
+    if(pl.jump)t='⬆ JUMP!';else if(pl.duck)t='⬇ DUCK!';
+    else if(pl.tgt===0)t='◀ LEFT';else if(pl.tgt===2)t='RIGHT ▶';
     gestEl.textContent=t;
 }
 
@@ -1719,7 +1740,9 @@ function beginPlay(){
     applyTheme(0);
     dom.hud.style.display='';dom.hudR.style.display='';
     dom.comboFire.style.height='0';dom.streak.style.display='none';
-    document.getElementById('touchControls').style.display=G.controlMode==='touch'?'block':'none';
+    document.getElementById('touchControls').style.display='none';
+    // Hide camera preview in swipe mode
+    if(G.controlMode==='swipe')document.getElementById('camBox').style.display='none';
 }
 function gameOver(){
     if(G.st==='over')return;// prevent double game-over
@@ -1881,24 +1904,14 @@ document.getElementById('quickReBtn').addEventListener('click',()=>{showIntersti
 document.getElementById('continueAdBtn').addEventListener('click',()=>continueWithAd());
 
 // Control mode selection buttons
-document.getElementById('ctrlBody').addEventListener('click',async()=>{
-    dom.controlSelectOv.style.display='none';G.controlMode='body';
-    await initPose();startCalibrationAndPlay();
-});
 document.getElementById('ctrlFace').addEventListener('click',async()=>{
     dom.controlSelectOv.style.display='none';G.controlMode='face';
+    document.getElementById('camBox').style.display='';
     await initPose();await initFaceMesh();startCalibrationAndPlay();
-});
-document.getElementById('ctrlTouch').addEventListener('click',()=>{
-    dom.controlSelectOv.style.display='none';G.controlMode='touch';
-    spawnActiveChar();
-    try{getAC().resume()}catch(e){}
-    try{startMusic()}catch(e){}
-    G.gamesPlayed++;localStorage.setItem('r3GP',G.gamesPlayed);checkAchievement('first_game');
-    beginPlay();
 });
 document.getElementById('ctrlSwipe').addEventListener('click',()=>{
     dom.controlSelectOv.style.display='none';G.controlMode='swipe';
+    document.getElementById('camBox').style.display='none';
     spawnActiveChar();
     try{getAC().resume()}catch(e){}
     try{startMusic()}catch(e){}
