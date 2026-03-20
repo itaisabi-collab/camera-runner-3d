@@ -5,11 +5,6 @@
   "server": {
     "androidScheme": "https"
   },
-  "plugins": {
-    "Camera": {
-      "permissions": ["camera"]
-    }
-  },
   "android": {
     "allowMixedContent": true,
     "backgroundColor": "#0a0020"
