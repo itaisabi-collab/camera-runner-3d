@@ -1804,9 +1804,9 @@ async function initAdMob(){
         const {AdMob}=Capacitor.Plugins;
         await AdMob.initialize({});
         // Rewarded ad - "continue playing" / "unlock character"
-        await AdMob.prepareRewardVideoAd({adId:'ca-app-pub-XXXX/YYYY'});// REPLACE with real AdMob ID
+        await AdMob.prepareRewardVideoAd({adId:'ca-app-pub-5058342416317511/4124873680'});// REPLACE with real AdMob ID
         // Interstitial - between games
-        await AdMob.prepareInterstitial({adId:'ca-app-pub-XXXX/ZZZZ'});// REPLACE with real AdMob ID
+        await AdMob.prepareInterstitial({adId:'ca-app-pub-5058342416317511/2460705129'});// REPLACE with real AdMob ID
         adMobReady=true;
         console.log('AdMob ready!');
     }catch(e){console.log('AdMob not available (web mode):',e)}
@@ -1818,7 +1818,7 @@ async function showRewardedAd(){
         try{
             const {AdMob}=Capacitor.Plugins;
             const result=await AdMob.showRewardVideoAd();
-            await AdMob.prepareRewardVideoAd({adId:'ca-app-pub-XXXX/YYYY'});
+            await AdMob.prepareRewardVideoAd({adId:'ca-app-pub-5058342416317511/4124873680'});
             return true;
         }catch(e){return false}
     }
@@ -1842,7 +1842,7 @@ async function showInterstitial(){
     try{
         const {AdMob}=Capacitor.Plugins;
         await AdMob.showInterstitial();
-        await AdMob.prepareInterstitial({adId:'ca-app-pub-XXXX/ZZZZ'});
+        await AdMob.prepareInterstitial({adId:'ca-app-pub-5058342416317511/2460705129'});
     }catch(e){}
 }
 
