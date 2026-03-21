@@ -158,6 +158,7 @@
     </div>
     <button class="btn" id="startBtn">▶ PLAY</button>
     <button class="btn" id="tvBtn" style="background:linear-gradient(135deg,#ff6b35,#ff1493);margin-top:8px;padding:12px 36px;font-size:1em">📺 Play on TV</button>
+    <button class="btn" id="lbBtn" style="background:linear-gradient(135deg,#f5af19,#f12711);margin-top:8px;padding:12px 36px;font-size:1em">🏆 Leaderboard</button>
     <div id="loadTxt">Loading...</div>
     <p style="font-size:.7em;color:rgba(150,160,200,.35);margin-top:6px">Arrows / Swipe also work</p>
 </div>
@@ -222,7 +223,21 @@
         <button class="btn" id="quickReBtn">🔄 PLAY AGAIN</button><br>
         <button class="share-btn" id="reBtn">🎭 Change Character</button>
         <button class="share-btn" id="shareBtn" onclick="shareScore()">📤 Share Score</button>
+        <button class="share-btn" id="lbBtnGO" style="background:linear-gradient(135deg,#f5af19,#f12711)">🏆 Leaderboard</button>
     </div>
+</div>
+<div id="lbOv" class="ov" style="display:none">
+    <h2 style="font-size:2em;margin-bottom:10px">🏆 Leaderboard</h2>
+    <div id="lbList" style="max-width:350px;margin:0 auto;text-align:left"></div>
+    <button class="btn" id="lbCloseBtn" style="margin-top:15px;padding:10px 30px">Close</button>
+</div>
+<div id="nameOv" class="ov" style="display:none">
+    <h2 style="font-size:1.8em;margin-bottom:10px">🎉 New High Score!</h2>
+    <p id="nameScore" style="font-size:1.5em;color:#FFD700"></p>
+    <input id="nameInput" type="text" maxlength="15" placeholder="Your name" style="font-size:1.3em;padding:12px;border-radius:12px;border:2px solid rgba(0,229,255,.4);background:rgba(10,3,30,.8);color:#fff;text-align:center;width:200px;margin:15px 0">
+    <br>
+    <button class="btn" id="nameSubmit" style="padding:12px 30px">Submit Score</button>
+    <button class="btn" id="nameSkip" style="background:rgba(255,255,255,.1);padding:10px 20px;margin-top:8px">Skip</button>
 </div>
 <script>
 window.onerror=function(m,u,l){const e=document.getElementById('errBox');e.style.display='block';e.textContent=m+' (L'+l+')'};
@@ -1761,6 +1776,7 @@ function gameOver(){
     dom.hud.style.display='none';dom.hudR.style.display='none';
     dom.comboFire.style.height='0';dom.speedLines.style.opacity='0';dom.streak.style.display='none';dom.powerUpHud.style.display='none';
     document.getElementById('touchControls').style.display='none';
+    checkHighScore(G.score);
     if(goTimeout)clearTimeout(goTimeout);
     goTimeout=setTimeout(()=>{if(G.st==='over')dom.goOv.style.display='flex'},500);
 }
@@ -1887,6 +1903,60 @@ function addToWallet(coins){
     localStorage.setItem(walletKey,wallet);
 }
 
+// ═══════════════════ LEADERBOARD ═══════════════════
+const FIREBASE_DB='https://run3d-camera-runner-default-rtdb.firebaseio.com';
+let myBestScore=+(localStorage.getItem('r3Best')||0);
+let playerName=localStorage.getItem('r3Name')||'';
+
+async function fetchLeaderboard(){
+    try{
+        const r=await fetch(FIREBASE_DB+'/scores.json?orderBy="score"&limitToLast=10');
+        if(!r.ok)return[];
+        const data=await r.json();
+        if(!data)return[];
+        return Object.values(data).sort((a,b)=>b.score-a.score);
+    }catch(e){console.log('Leaderboard fetch failed');return[]}
+}
+
+async function submitScore(name,score){
+    try{
+        const r=await fetch(FIREBASE_DB+'/scores.json',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({name,score:Math.floor(score),date:new Date().toISOString().slice(0,10)})
+        });
+        return r.ok;
+    }catch(e){return false}
+}
+
+async function showLeaderboard(){
+    const el=document.getElementById('lbList');
+    el.innerHTML='<p style="text-align:center;color:#aaa">Loading...</p>';
+    document.getElementById('lbOv').style.display='flex';
+    const scores=await fetchLeaderboard();
+    if(scores.length===0){el.innerHTML='<p style="text-align:center;color:#aaa">No scores yet. Be the first!</p>';return}
+    let html='<table style="width:100%;border-collapse:collapse">';
+    html+='<tr style="color:#FFD700;border-bottom:1px solid rgba(255,255,255,.2)"><th style="padding:8px;text-align:left">#</th><th style="text-align:left">Name</th><th style="text-align:right">Score</th></tr>';
+    scores.forEach((s,i)=>{
+        const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':''+(i+1);
+        const highlight=s.name===playerName?'color:#00e5ff;font-weight:bold':'color:#fff';
+        html+=`<tr style="${highlight};border-bottom:1px solid rgba(255,255,255,.1)"><td style="padding:6px 8px">${medal}</td><td>${s.name}</td><td style="text-align:right">${s.score.toLocaleString()}</td></tr>`;
+    });
+    html+='</table>';
+    el.innerHTML=html;
+}
+
+function checkHighScore(score){
+    const s=Math.floor(score);
+    if(s>myBestScore){
+        myBestScore=s;
+        localStorage.setItem('r3Best',s);
+        document.getElementById('nameScore').textContent=s.toLocaleString()+' pts!';
+        document.getElementById('nameInput').value=playerName;
+        document.getElementById('nameOv').style.display='flex';
+    }
+}
+
 // ═══════════════════ INIT ═══════════════════
 document.getElementById('startBtn').addEventListener('click',goToCharSelect);
 document.getElementById('selectChar').addEventListener('click',async()=>{
@@ -1902,6 +1972,16 @@ document.getElementById('nextChar').addEventListener('click',()=>{G.selectedChar
 document.getElementById('reBtn').addEventListener('click',()=>goToCharSelect());
 document.getElementById('quickReBtn').addEventListener('click',()=>{showInterstitial();quickRestart()});
 document.getElementById('continueAdBtn').addEventListener('click',()=>continueWithAd());
+document.getElementById('lbBtn').addEventListener('click',()=>showLeaderboard());
+document.getElementById('lbBtnGO').addEventListener('click',()=>showLeaderboard());
+document.getElementById('lbCloseBtn').addEventListener('click',()=>{document.getElementById('lbOv').style.display='none'});
+document.getElementById('nameSubmit').addEventListener('click',async()=>{
+    const name=document.getElementById('nameInput').value.trim()||'Anonymous';
+    playerName=name;localStorage.setItem('r3Name',name);
+    document.getElementById('nameOv').style.display='none';
+    await submitScore(name,myBestScore);
+});
+document.getElementById('nameSkip').addEventListener('click',()=>{document.getElementById('nameOv').style.display='none'});
 
 // Control mode selection buttons
 document.getElementById('ctrlBody').addEventListener('click',async()=>{
