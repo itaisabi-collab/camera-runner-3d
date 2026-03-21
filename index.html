@@ -226,12 +226,12 @@
         <button class="share-btn" id="lbBtnGO" style="background:linear-gradient(135deg,#f5af19,#f12711)">🏆 Leaderboard</button>
     </div>
 </div>
-<div id="lbOv" class="ov" style="display:none">
+<div id="lbOv" class="ov" style="display:none;z-index:50">
     <h2 style="font-size:2em;margin-bottom:10px">🏆 Leaderboard</h2>
     <div id="lbList" style="max-width:350px;margin:0 auto;text-align:left"></div>
     <button class="btn" id="lbCloseBtn" style="margin-top:15px;padding:10px 30px">Close</button>
 </div>
-<div id="nameOv" class="ov" style="display:none">
+<div id="nameOv" class="ov" style="display:none;z-index:50">
     <h2 style="font-size:1.8em;margin-bottom:10px">🎉 New High Score!</h2>
     <p id="nameScore" style="font-size:1.5em;color:#FFD700"></p>
     <input id="nameInput" type="text" maxlength="15" placeholder="Your name" style="font-size:1.3em;padding:12px;border-radius:12px;border:2px solid rgba(0,229,255,.4);background:rgba(10,3,30,.8);color:#fff;text-align:center;width:200px;margin:15px 0">
@@ -1951,9 +1951,12 @@ function checkHighScore(score){
     if(s>myBestScore){
         myBestScore=s;
         localStorage.setItem('r3Best',s);
-        document.getElementById('nameScore').textContent=s.toLocaleString()+' pts!';
-        document.getElementById('nameInput').value=playerName;
-        document.getElementById('nameOv').style.display='flex';
+        // Show name input AFTER game over overlay appears (delay 600ms)
+        setTimeout(()=>{
+            document.getElementById('nameScore').textContent=s.toLocaleString()+' pts!';
+            document.getElementById('nameInput').value=playerName;
+            document.getElementById('nameOv').style.display='flex';
+        },700);
     }
 }
 
